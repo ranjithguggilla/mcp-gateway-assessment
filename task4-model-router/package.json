@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "start:mock": "node dist/mock-provider/server.js",
+    "start:gateway": "node dist/server.js",
+    "demo": "bash demo.sh"
   }
 }
