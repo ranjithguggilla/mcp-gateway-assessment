@@ -5,6 +5,13 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "start": "node dist/server.js",
+    "demo": "node dist/server.js < fixtures/session.jsonl 2>/dev/null | jq -c ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
   }
 }
