@@ -11,7 +11,7 @@ import { GatewayError } from "./errors.js";
 import { TokenLimiter, estimateTokens } from "./limiter.js";
 import { HttpProvider } from "./providers.js";
 import { route } from "./router.js";
-import { log } from "./log.js";
+import { log, tenantTag } from "./log.js";
 
 const PORT = Number(process.env.ROUTER_PORT ?? 3002);
 const DB_PATH = process.env.DB_PATH ?? "./data/gateway.db";
@@ -95,7 +95,7 @@ const server = createServer(async (req, res) => {
     });
 
     const r = await route(routerOpts, tenant, { prompt: body.prompt, max_tokens }, requestId, ac.signal, estimate);
-    log("info", "request.ok", { requestId, tenant, provider: r.provider, failedOver: r.failed_over, tokens: r.usage.total_tokens, estimate: estimate ?? estimateTokens(body.prompt, max_tokens), ms: +(performance.now() - t0).toFixed(1) });
+    log("info", "request.ok", { requestId, tenant: tenantTag(tenant), provider: r.provider, failedOver: r.failed_over, tokens: r.usage.total_tokens, estimate: estimate ?? estimateTokens(body.prompt, max_tokens), ms: +(performance.now() - t0).toFixed(1) });
     return send(res, 200, { text: r.text, provider: r.provider, failed_over: r.failed_over, usage: r.usage, request_id: requestId }, { ...base, "x-ratelimit-remaining": String(r.rate_limit.remaining) });
   } catch (err) {
     const ge = err instanceof GatewayError ? err : new GatewayError("INTERNAL", "Internal error", { cause: err });

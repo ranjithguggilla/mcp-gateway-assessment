@@ -1,7 +1,7 @@
 import { GatewayError } from "./errors.js";
 import { estimateTokens, type TokenLimiter } from "./limiter.js";
 import { ProviderError, isAbort, type CompletionRequest, type CompletionResult, type Provider } from "./providers.js";
-import { log } from "./log.js";
+import { log, tenantTag } from "./log.js";
 
 export interface RouterOptions {
   limiter: TokenLimiter;
@@ -36,7 +36,7 @@ export async function route(
   const estimate = estimateOverride ?? estimateTokens(req.prompt, req.max_tokens);
   const reservation = opts.limiter.tryReserve(tenant, estimate, requestId);
   if (!reservation.ok) {
-    log("warn", "rate_limited", { requestId, tenant, estimate, used: reservation.used, retryAfterMs: reservation.retryAfterMs });
+    log("warn", "rate_limited", { requestId, tenant: tenantTag(tenant), estimate, used: reservation.used, retryAfterMs: reservation.retryAfterMs });
     throw new GatewayError("RATE_LIMITED", "Token budget exhausted for this window", {
       retryAfterMs: reservation.retryAfterMs,
       details: { limit: opts.limiter.opts.limit, remaining: reservation.remaining },
