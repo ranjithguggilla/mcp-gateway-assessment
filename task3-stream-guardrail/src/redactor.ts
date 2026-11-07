@@ -30,8 +30,11 @@
 
 export const DEFAULT_MAX_HOLD = 254;
 
-// email | ssn | card (13-19 digits with optional single space/dash separators)
-const PII_RE = /([A-Z0-9._%+-]{1,64}@[A-Z0-9.-]{1,189}\.[A-Z]{2,})|(\b\d{3}-\d{2}-\d{4}\b)|(\b(?:\d[ -]?){12,18}\d\b)/gi;
+// Pass 1: email | ssn.   Pass 2: card (13-19 digits with optional single space/dash separators).
+// Two passes because the card pattern is greedy: "4111111111111111 123-45-6789" would otherwise be
+// swallowed as one span, fail Luhn, and leak both the card and the SSN.
+const EMAIL_SSN_RE = /([A-Z0-9._%+-]{1,64}@[A-Z0-9.-]{1,189}\.[A-Z]{2,})|(\b\d{3}-\d{2}-\d{4}\b)/gi;
+const CHAIN_RE = /(?<!\w)\d+(?:[ -]\d+)*(?!\w)/g;
 
 export const REDACTED = "[REDACTED]";
 
@@ -71,8 +74,62 @@ export interface RedactStats {
   overflowSuppressed: number;
 }
 
+/** Digit-group lengths a real card number is written in; used to keep sub-window matching from firing on arbitrary digit lists. */
+function cardShaped(lens: number[]): boolean {
+  if (lens.length === 1) return true; // contiguous digits
+  const k = lens.length;
+  const fours = lens.slice(0, k - 1).every((n) => n === 4) && lens[k - 1]! >= 1 && lens[k - 1]! <= 4; // 4-4-4-4, 4-4-4-3, ...
+  const amex = k === 3 && lens[0] === 4 && lens[1] === 6 && lens[2] === 5;
+  const diners = k === 3 && lens[0] === 4 && lens[1] === 6 && lens[2] === 4;
+  return fours || amex || diners;
+}
+
+/**
+ * A "chain" is digit groups joined by single spaces or dashes. It may contain a card plus neighbouring numbers
+ * ("4111111111111111 123", or an invalid-SSN-looking prefix before a card). The whole chain is tried first
+ * (the original rule); otherwise card-shaped windows of 13-19 digits are tried left to right, longest first.
+ */
+function redactChain(chain: string, stats?: RedactStats): string {
+  const groups = [...chain.matchAll(/\d+/g)].map((g) => ({ start: g.index!, end: g.index! + g[0].length, len: g[0].length }));
+  const total = groups.reduce((n, g) => n + g.len, 0);
+  if (total >= 13 && total <= 19 && luhn(chain)) {
+    if (stats) stats.cards++;
+    return REDACTED;
+  }
+  let out = "";
+  let pos = 0;
+  const kept: string[] = []; // runs left in clear; a run of 13+ digits that failed Luhn is counted as skipped
+  for (let i = 0; i < groups.length; ) {
+    let hit = -1;
+    let digits = 0;
+    const lens: number[] = [];
+    for (let j = i; j < groups.length; j++) {
+      digits += groups[j]!.len;
+      lens.push(groups[j]!.len);
+      if (digits > 19) break;
+      if (digits >= 13 && cardShaped(lens) && luhn(chain.slice(groups[i]!.start, groups[j]!.end))) hit = j;
+    }
+    if (hit === -1) {
+      i++;
+      continue;
+    }
+    if (stats) stats.cards++;
+    kept.push(chain.slice(pos, groups[i]!.start));
+    out += chain.slice(pos, groups[i]!.start) + REDACTED;
+    pos = groups[hit]!.end;
+    i = hit + 1;
+  }
+  kept.push(chain.slice(pos));
+  if (stats) for (const k of kept) if ((k.match(/\d/g)?.length ?? 0) >= 13) stats.cardsSkippedLuhn++;
+  return out + chain.slice(pos);
+}
+
+function redactCards(text: string, stats?: RedactStats): string {
+  return text.replace(CHAIN_RE, (m) => redactChain(m, stats));
+}
+
 export function redactText(text: string, stats?: RedactStats): string {
-  return text.replace(PII_RE, (m: string, email?: string, ssn?: string, card?: string) => {
+  const pass1 = text.replace(EMAIL_SSN_RE, (m: string, email?: string, ssn?: string) => {
     if (email) {
       if (stats) stats.emails++;
       return REDACTED;
@@ -82,16 +139,9 @@ export function redactText(text: string, stats?: RedactStats): string {
       if (stats) stats.ssns++;
       return REDACTED;
     }
-    if (card) {
-      if (!luhn(card)) {
-        if (stats) stats.cardsSkippedLuhn++;
-        return m;
-      }
-      if (stats) stats.cards++;
-      return REDACTED;
-    }
     return m;
   });
+  return redactCards(pass1, stats);
 }
 
 function isWs(c: string): boolean {
