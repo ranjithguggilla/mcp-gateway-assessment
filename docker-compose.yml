@@ -1,0 +1,103 @@
+# docker compose up --build
+#
+# One image, six services. Mocks sit on an internal-only network and are reachable
+# by service name; only the three gateways publish ports.
+#
+#   :3000  mcp-gateway       -> mock-mcp:4000        (Task 2)
+#   :3001  stream-guardrail  -> mock-llm:4001        (Task 3)
+#   :3002  model-router      -> mock-provider:4002   (Task 4)
+#   Task 1 is a stdio process: docker compose run --rm mcp-server  (profile "stdio")
+
+x-base: &base
+  build: .
+  image: mcp-gateway-assessment:local
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+services:
+  mock-mcp:
+    <<: *base
+    command: ["node", "task2-mcp-gateway/dist/mock-downstream/server.js"]
+    environment:
+      DOWNSTREAM_PORT: "4000"
+      DOWNSTREAM_SERVICE_TOKEN: ${DOWNSTREAM_SERVICE_TOKEN:-svc-local-dev}
+    networks: [internal]
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://localhost:4000/healthz"], interval: 5s, timeout: 2s, retries: 10 }
+
+  mcp-gateway:
+    <<: *base
+    command: ["node", "task2-mcp-gateway/dist/gateway/server.js"]
+    environment:
+      GATEWAY_PORT: "3000"
+      DOWNSTREAM_URL: http://mock-mcp:4000/mcp
+      DOWNSTREAM_SERVICE_TOKEN: ${DOWNSTREAM_SERVICE_TOKEN:-svc-local-dev}
+      STATIC_TOKENS: ${STATIC_TOKENS:-tok_admin:admin,tok_viewer:viewer}
+    ports: ["3000:3000"]
+    depends_on: { mock-mcp: { condition: service_healthy } }
+    networks: [internal, edge]
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://localhost:3000/readyz"], interval: 5s, timeout: 2s, retries: 10 }
+
+  mock-llm:
+    <<: *base
+    command: ["node", "task3-stream-guardrail/dist/mock-llm/server.js"]
+    environment: { MOCK_LLM_PORT: "4001" }
+    networks: [internal]
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://localhost:4001/healthz"], interval: 5s, timeout: 2s, retries: 10 }
+
+  stream-guardrail:
+    <<: *base
+    command: ["node", "task3-stream-guardrail/dist/server.js"]
+    environment:
+      GUARDRAIL_PORT: "3001"
+      PROVIDER_URL: http://mock-llm:4001/v1/stream
+    ports: ["3001:3001"]
+    depends_on: { mock-llm: { condition: service_healthy } }
+    networks: [internal, edge]
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://localhost:3001/readyz"], interval: 5s, timeout: 2s, retries: 10 }
+
+  mock-provider:
+    <<: *base
+    command: ["node", "task4-model-router/dist/mock-provider/server.js"]
+    environment:
+      MOCK_PROVIDER_PORT: "4002"
+      MOCK_PRIMARY_MODE: ${MOCK_PRIMARY_MODE:-ok}
+      MOCK_SECONDARY_MODE: ${MOCK_SECONDARY_MODE:-ok}
+    networks: [internal]
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://localhost:4002/healthz"], interval: 5s, timeout: 2s, retries: 10 }
+
+  model-router:
+    <<: *base
+    command: ["node", "task4-model-router/dist/server.js"]
+    environment:
+      ROUTER_PORT: "3002"
+      DB_PATH: /data/gateway.db
+      PRIMARY_URL: http://mock-provider:4002/primary
+      SECONDARY_URL: http://mock-provider:4002/secondary
+      PRIMARY_TIMEOUT_MS: "3000"
+      TOKEN_LIMIT: "50000"
+      WINDOW_MS: "60000"
+    ports: ["3002:3002"]
+    volumes: [router-data:/data]
+    depends_on: { mock-provider: { condition: service_healthy } }
+    networks: [internal, edge]
+    healthcheck: { test: ["CMD", "curl", "-sf", "http://localhost:3002/readyz"], interval: 5s, timeout: 2s, retries: 10 }
+
+  mcp-server:
+    <<: *base
+    profiles: [stdio]
+    restart: "no"
+    stdin_open: true
+    command: ["node", "task1-mcp-server/dist/server.js"]
+    networks: [internal]
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  router-data: {}
