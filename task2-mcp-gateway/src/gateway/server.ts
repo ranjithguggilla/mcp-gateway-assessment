@@ -110,7 +110,12 @@ const server = createServer(async (req, res) => {
 
   // 2. parse
   const raw = await readBody(req);
-  if (raw === null) return sendJson(res, 413, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Body too large" } });
+  if (raw === null) {
+    // The rest of the oversized body is still on the wire. Close the connection after replying so a
+    // keep-alive client cannot have those bytes parsed as its next request (seen as ECONNRESET).
+    res.once("finish", () => req.destroy());
+    return sendJson(res, 413, { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Body too large" } }, { connection: "close" });
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw.toString("utf8"));
@@ -141,7 +146,10 @@ const server = createServer(async (req, res) => {
   }
 
   // 4. forward
-  await proxy(req, res, raw, ctx);
+  // Forward what was authorized, not what was received: re-serializing the parsed value means a body with
+  // duplicate keys ({"name":"admin_x","name":"echo"}) reaches the downstream exactly as `decide()` saw it,
+  // whatever that downstream's own duplicate-key rule is. (Trade-off: integers beyond 2^53 are not preserved.)
+  await proxy(req, res, Buffer.from(JSON.stringify(parsed)), ctx);
 });
 
 server.listen(PORT, () => log("info", "gateway.listening", { port: PORT, downstream: DOWNSTREAM_URL }));

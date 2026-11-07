@@ -49,3 +49,12 @@ describe("auth", () => {
     expect(resolveRole(null, tokens)).toBeNull();
   });
 });
+
+describe("case and whitespace variants of a protected prefix (hardening)", () => {
+  it.each(["ADMIN_reset_key", "Admin_reset_key", " admin_reset_key", "admin_reset_key "])("denies %j for viewer", (name) => {
+    expect(decide("viewer", { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name } }).kind).toBe("deny");
+  });
+  it("still allows an unrelated tool", () => {
+    expect(decide("viewer", { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "administer" } }).kind).toBe("allow");
+  });
+});

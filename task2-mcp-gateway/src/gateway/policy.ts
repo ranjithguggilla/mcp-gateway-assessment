@@ -23,7 +23,7 @@ export function decide(role: Role, msg: unknown): Decision {
   const name = typeof m.params === "object" && m.params !== null ? (m.params as { name?: unknown }).name : undefined;
   if (typeof name !== "string") return { kind: "invalid", id, reason: "tools/call requires params.name (string)" };
   for (const rule of PROTECTED_PREFIXES) {
-    if (name.startsWith(rule.prefix) && role !== rule.required) return { kind: "deny", id, tool: name, required: rule.required };
+    if (name.trim().toLowerCase().startsWith(rule.prefix) && role !== rule.required) return { kind: "deny", id, tool: name, required: rule.required };
   }
   return { kind: "allow" };
 }
