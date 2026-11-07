@@ -37,6 +37,22 @@ describe("separate OS processes sharing one SQLite file", () => {
   });
 });
 
+describe("cold start", () => {
+  it("six processes opening the same brand-new database file at once all succeed", async () => {
+    for (let round = 0; round < 3; round++) {
+      const path = join(mkdtempSync(join(tmpdir(), "t4-cold-")), "x.db");
+      const code = `import { openDb } from ${JSON.stringify(resolve(root, "dist/db.js"))}; openDb(process.argv[1]).close();`;
+      const results = await Promise.all(Array.from({ length: 6 }, () => new Promise<{ code: number | null; err: string }>((res) => {
+        const c = spawn(process.execPath, ["--no-warnings", "--input-type=module", "-e", code, path], { stdio: ["ignore", "ignore", "pipe"] });
+        let err = "";
+        c.stderr!.on("data", (d) => (err += d));
+        c.on("close", (code) => res({ code, err }));
+      })));
+      for (const r of results) expect(r, r.err).toMatchObject({ code: 0 });
+    }
+  });
+});
+
 describe("API keys are not written to logs", () => {
   let mock: ChildProcess, router: ChildProcess;
   let logs = "";

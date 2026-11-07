@@ -7,7 +7,7 @@ Four runnable tasks in one repo, no external API keys needed. TypeScript on Node
 | 1 — MCP server (stdio) | `task1-mcp-server/` | stdout is pure JSON-RPC, `-32602` on malformed input, `isError` on business failures | 28 |
 | 2 — MCP security gateway | `task2-mcp-gateway/` | bearer → role, fail-closed 401, `-32001` for `admin_*` without touching the downstream | 31 |
 | 3 — Streaming PII guardrail | `task3-stream-guardrail/` | redaction across chunk boundaries, bounded memory, measured TTFT | 43 |
-| 4 — Rate limiter + fallback router | `task4-model-router/` | atomic SQLite reservation (20 → exactly 10), 429/timeout failover, sanitized 503 | 28 |
+| 4 — Rate limiter + fallback router | `task4-model-router/` | atomic SQLite reservation (20 → exactly 10), 429/timeout failover, sanitized 503 | 29 |
 
 ## Run everything
 
@@ -140,7 +140,7 @@ Built against the MCP wire line that `@modelcontextprotocol/sdk` 1.x implements 
 * Task 1 frames stdin itself (`src/transport.ts`) because the SDK's stdio transport drops non-JSON lines silently and turns a structurally wrong `tools/call` into `-32603` with a zod dump. Here: non-JSON → `-32700`, not a JSON-RPC 2.0 message or a batch → `-32600`, bad `params`/`name`/`arguments` shape → `-32602`.
 * Task 2 forwards the re-serialized JSON it authorized, not the client's raw bytes (closes duplicate-key parser differentials). Integers beyond 2^53 are therefore not preserved. A body over the 1 MB cap gets `413` and the connection is closed.
 * Task 3 finds cards by scanning chains of digit groups and trying card-shaped Luhn-valid windows, so `4111111111111111 123` (card + CVV) and `4111111111111111 123-45-6789` are both caught. Plain 13–19 digit runs that fail Luhn, and digit-glued tokens like `4111111111111111abc`, are left alone.
-* Task 4 trusts a client-supplied `estimated_tokens` for the reservation (it is reconciled to the provider's real usage afterwards) and stores the `X-API-Key` value as the tenant id in SQLite; logs carry only a short SHA-256 fingerprint. A single request larger than the whole window still gets `429`.
+* Task 4 sets `busy_timeout` before switching to WAL, so several processes can cold-start on one database file. It trusts a client-supplied `estimated_tokens` for the reservation (it is reconciled to the provider's real usage afterwards) and stores the `X-API-Key` value as the tenant id in SQLite; logs carry only a short SHA-256 fingerprint. A single request larger than the whole window still gets `429`.
 * If the provider drops mid-stream, Task 3 ends the client stream without `[DONE]` and discards the held tail (no leak, but no explicit error event).
 * `node:sqlite` prints an `ExperimentalWarning` on Node 22; it is stable in Node 24.
 

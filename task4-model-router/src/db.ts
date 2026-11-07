@@ -10,8 +10,10 @@ import { dirname } from "node:path";
 export function openDb(path: string): DatabaseSync {
   mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
-  db.exec("PRAGMA journal_mode=WAL");
+  // busy_timeout must come first: switching to WAL needs a lock, and without a busy handler a second
+  // process starting at the same moment fails immediately with "database is locked".
   db.exec("PRAGMA busy_timeout=5000");
+  db.exec("PRAGMA journal_mode=WAL");
   db.exec("PRAGMA synchronous=NORMAL");
   db.exec(`
     CREATE TABLE IF NOT EXISTS usage (
