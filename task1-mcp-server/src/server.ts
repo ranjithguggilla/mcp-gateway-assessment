@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "./harden.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { LineStdioTransport } from "./transport.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ZodTypeAny } from "zod";
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.stdin.on("end", () => void shutdown("stdin_end"));
 
-  await server.connect(new StdioServerTransport());
+  await server.connect(new LineStdioTransport());
   log("info", "server.started", { name: "customer-ops", transport: "stdio", pid: process.pid });
 }
 
