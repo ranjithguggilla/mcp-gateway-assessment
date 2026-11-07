@@ -5,6 +5,14 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "start:downstream": "node dist/mock-downstream/server.js",
+    "start:gateway": "node dist/gateway/server.js",
+    "demo": "bash demo.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "undici": "^8.12.4",
+    "zod": "^3.25.76"
   }
 }
