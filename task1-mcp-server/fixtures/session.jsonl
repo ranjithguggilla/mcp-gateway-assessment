@@ -1,0 +1,19 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"fixture-client","version":"1.0.0"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_customer_record","arguments":{"customer_id":"CUST-12345"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00001","amount":25.5,"reason":"Duplicate charge on invoice 8841"}}}
+{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"get_customer_record","arguments":{"customer_id":"CUST-1234"}}}
+{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"get_customer_record","arguments":{"customer_id":"cust-12345"}}}
+{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"get_customer_record","arguments":{"customer_id":"CUST-123456"}}}
+{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00001","amount":-1,"reason":"Negative amount should be rejected"}}}
+{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00001","amount":"10","reason":"String amount should be rejected"}}}
+{"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00001","amount":10,"reason":"short"}}}
+{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00001","amount":10,"reason":"           "}}}
+{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00001","amount":1e400,"reason":"Infinity must be rejected"}}}
+{"jsonrpc":"2.0","id":18,"method":"tools/call","params":{"name":"get_customer_record","arguments":{"customer_id":"xCUST-12345y"}}}
+{"jsonrpc":"2.0","id":19,"method":"tools/call","params":{"name":"get_customer_record","arguments":{}}}
+{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"get_customer_record","arguments":{"customer_id":"CUST-99999"}}}
+{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"trigger_refund","arguments":{"customer_id":"CUST-00004","amount":5,"reason":"Suspended customer should be a business error"}}}
+{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"no_such_tool","arguments":{}}}
+{"jsonrpc":"2.0","id":23,"method":"no/such/method"}
