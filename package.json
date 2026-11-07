@@ -1,0 +1,28 @@
+{
+  "name": "mcp-gateway-assessment",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test --workspaces",
+    "build": "npm run build --workspaces"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "workspaces": [
+    "task1-mcp-server",
+    "task2-mcp-gateway",
+    "task3-stream-guardrail",
+    "task4-model-router"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
